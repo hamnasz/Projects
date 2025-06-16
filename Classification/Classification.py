@@ -1,120 +1,212 @@
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
-data = pd.read_csv("/workspaces/Projects/Classification/churn.csv")
-
-print("First 5 rows of the dataset:")
-print(data.head())
-print("\nLast 5 rows of the dataset:")
-print(data.tail())
-print("\nDataset shape:", data.shape)
-print("\nRandom sample of the dataset:")
-print(data.sample(5))
-print("\nDataset info:")
-print(data.info())
-print("\nSummary statistics:")
-print(data.describe())
-print("\nMissing values:")
-print(data.isnull().sum())
-
-if "customerID" in data.columns:
-    data = data.drop("customerID", axis=1)
-
-data["Churn"] = data["Churn"].map({"Yes": 1, "No": 0})
-
-data["TotalCharges"] = pd.to_numeric(data["TotalCharges"], errors='coerce')
-data["TotalChargesPerTenure"] = data["TotalCharges"] / (data["tenure"] + 1e-6)
-
-print("\nDataset with new feature:")
-print(data[["tenure", "TotalCharges", "TotalChargesPerTenure", "Churn"]].head())
-
-figure = px.scatter(data_frame=data, x="MonthlyCharges", y="TotalChargesPerTenure", 
-                    size="tenure", color="Churn", 
-                    title="MonthlyCharges vs TotalChargesPerTenure by Churn")
-figure.show()
-
-fig = px.box(data, x="Contract", y="MonthlyCharges", color="Churn", 
-             title="MonthlyCharges Distribution by Contract Type and Churn")
-fig.show()
-
-fig = px.box(data, x="InternetService", y="tenure", color="Churn", 
-             title="Tenure Distribution by InternetService and Churn")
-fig.show()
-
-correlation = data.select_dtypes(include=[np.number]).corr()
-print("\nCorrelation with Churn:")
-print(correlation["Churn"].sort_values(ascending=False))
-
-numeric_features = ["tenure", "MonthlyCharges", "TotalChargesPerTenure"]
-categorical_features = ["Contract", "InternetService", "PaymentMethod"]
-
-data_encoded = pd.get_dummies(data[categorical_features], drop_first=True)
-X = pd.concat([data[numeric_features], data_encoded], axis=1)
-y = data["Churn"]
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-model = Sequential()
-model.add(Dense(16, activation='relu', input_dim=X_train_scaled.shape[1]))
-model.add(Dense(8, activation='relu'))
-model.add(Dense(1, activation='sigmoid'))
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-model.fit(X_train_scaled, y_train, epochs=100, verbose=0)
-
-y_pred_prob = model.predict(X_test_scaled)
-y_pred = (y_pred_prob > 0.5).astype(int)
-
-conf_matrix = confusion_matrix(y_test, y_pred)
-report = classification_report(y_test, y_pred)
-print("\nConfusion Matrix:\n", conf_matrix)
-print("\nClassification Report:\n", report)
-
-disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["No Churn", "Churn"])
-disp.plot(cmap=plt.cm.Blues)
-plt.title("Confusion Matrix for Churn Prediction")
+churn_data = pd.read_csv("/workspaces/Projects/Classification/churn.csv")
+print(churn_data.head())
+print(churn_data.shape)
+print(churn_data.ndim)
+print(churn_data['Churn'].value_counts().rename('count'))
+print(churn_data['Churn'].value_counts(normalize=True).rename('%').mul(100))
+sns.countplot(data=churn_data, x='Churn')
+plt.title('Number of Customers')
 plt.show()
-
-print("\nChurn Prediction for a New Customer")
-tenure = float(input("Tenure (months): "))
-monthly_charges = float(input("Monthly Charges ($): "))
-total_charges = float(input("Total Charges ($): "))
-contract = input("Contract Type (Month-to-month, One year, Two year): ")
-internet_service = input("Internet Service (DSL, Fiber optic, No): ")
-payment_method = input("Payment Method (Electronic check, Mailed check, Bank transfer (automatic), Credit card (automatic)): ")
-
-total_charges_per_tenure = total_charges / (tenure + 1e-6)
-new_data = pd.DataFrame({
-    "tenure": [tenure],
-    "MonthlyCharges": [monthly_charges],
-    "TotalChargesPerTenure": [total_charges_per_tenure]
-})
-new_data_encoded = pd.get_dummies(pd.DataFrame({
-    "Contract": [contract],
-    "InternetService": [internet_service],
-    "PaymentMethod": [payment_method]
-}), drop_first=True)
-
-for col in data_encoded.columns:
-    if col not in new_data_encoded.columns:
-        new_data_encoded[col] = 0
-
-new_data_encoded = new_data_encoded[X.columns[len(numeric_features):]]
-new_features = pd.concat([new_data, new_data_encoded], axis=1)
-new_features_scaled = scaler.transform(new_features)
-
-prediction = model.predict(new_features_scaled)
-churn_prob = prediction[0][0]
-print(f"Predicted Churn Probability: {churn_prob:.2f}")
-print("Predicted Outcome: ", "Churn" if churn_prob > 0.5 else "No Churn")
+print(churn_data.info())
+print(churn_data.sample(20))
+print(churn_data.describe())
+print(churn_data.columns)
+print('Missing data sum:')
+print(churn_data.isnull().sum())
+print('\nMissing data percentage (%):')
+print(churn_data.isnull().sum() / churn_data.count() * 100)
+numerical_cols = churn_data.select_dtypes(include=[np.number]).columns
+corr = churn_data[numerical_cols].corr()
+plt.figure(figsize=(12, 10))
+sns.heatmap(data=corr, annot=True, cmap='Spectral').set(title="Correlation Matrix")
+plt.show()
+corr_matrix = corr.round(2)
+mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+plt.figure(figsize=(10, 10))
+sns.heatmap(corr_matrix, center=0, vmin=-1, vmax=1, mask=mask, annot=True, cmap='BrBG')
+plt.show()
+cat_features = [col for col in churn_data.columns if churn_data[col].dtypes == 'object' and col != 'customerID']
+print('Number of categorical variables:', len(cat_features))
+print('*'*80)
+print('Categorical variables column name:', cat_features)
+numerical_features = [col for col in churn_data.columns if churn_data[col].dtypes != 'object' and col not in ['customerID']]
+print('Number of numerical variables:', len(numerical_features))
+print('*'*80)
+print('Numerical Variables Column:', numerical_features)
+print('Duplicates:', churn_data.duplicated().sum())
+for col in cat_features:
+    print(f"Unique values in {col}:", churn_data[col].unique())
+for col in numerical_features:
+    print(f"Number of unique values in {col}:", churn_data[col].nunique())
+for col in cat_features:
+    plt.figure(figsize=(6, 3), dpi=100)
+    sns.countplot(data=churn_data, x=col, hue='Churn', palette='gist_rainbow_r')
+    plt.legend(loc=(1.05, 0.5))
+    plt.xticks(rotation=45)
+    plt.show()
+for col in numerical_features:
+    plt.figure(figsize=(6, 3), dpi=100)
+    sns.barplot(data=churn_data, x='Churn', y=col, palette='gist_rainbow_r')
+    plt.show()
+churn_data['TotalCharges'] = pd.to_numeric(churn_data['TotalCharges'], errors='coerce')
+churn_data['TotalCharges'] = churn_data['TotalCharges'].fillna(churn_data['TotalCharges'].mean())
+print(churn_data.isnull().sum())
+train = churn_data.drop(['customerID'], axis=1)
+train_data_cat = train.select_dtypes("object")
+train_data_num = train.select_dtypes(include=[np.number])
+train_data_cat_encoded = pd.get_dummies(train_data_cat, columns=train_data_cat.columns.to_list())
+data = pd.concat([train_data_cat_encoded, train_data_num], axis=1)
+y = data['Churn_Yes']
+x = data.drop(['Churn_Yes', 'Churn_No'], axis=1)
+sc = StandardScaler()
+x = sc.fit_transform(x)
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=7)
+print(X_train.shape, X_test.shape)
+accuracy = {}
+lr = LogisticRegression(max_iter=200)
+lr.fit(X_train, y_train)
+y_pred1 = lr.predict(X_test)
+print("Logistic Regression Accuracy:", accuracy_score(y_test, y_pred1))
+accuracy[str(lr)] = accuracy_score(y_test, y_pred1) * 100
+cm = confusion_matrix(y_test, y_pred1)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred1))
+dtc = DecisionTreeClassifier(max_depth=3)
+dtc.fit(X_train, y_train)
+y_pred2 = dtc.predict(X_test)
+print("Decision Tree Accuracy:", accuracy_score(y_test, y_pred2))
+accuracy[str(dtc)] = accuracy_score(y_test, y_pred2) * 100
+cm = confusion_matrix(y_test, y_pred2)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred2))
+rfc = RandomForestClassifier(max_depth=5)
+rfc.fit(X_train, y_train)
+y_pred3 = rfc.predict(X_test)
+print("Random Forest Accuracy:", accuracy_score(y_test, y_pred3))
+accuracy[str(rfc)] = accuracy_score(y_test, y_pred3) * 100
+cm = confusion_matrix(y_test, y_pred3)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred3))
+gbc = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1)
+gbc.fit(X_train, y_train)
+y_pred4 = gbc.predict(X_test)
+print("Gradient Boosting Accuracy:", accuracy_score(y_test, y_pred4))
+accuracy[str(gbc)] = accuracy_score(y_test, y_pred4) * 100
+cm = confusion_matrix(y_test, y_pred4)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred4))
+svc = SVC()
+svc.fit(X_train, y_train)
+y_pred5 = svc.predict(X_test)
+print("SVC Accuracy:", accuracy_score(y_test, y_pred5))
+accuracy[str(svc)] = accuracy_score(y_test, y_pred5) * 100
+cm = confusion_matrix(y_test, y_pred5)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred5))
+print("Accuracy scores:", accuracy)
+smote = SMOTE()
+x1, y1 = smote.fit_resample(x, y)
+X_train, X_test, y_train, y_test = train_test_split(x1, y1, test_size=0.3, shuffle=True, random_state=3)
+print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+lr = LogisticRegression(max_iter=200)
+lr.fit(X_train, y_train)
+y_pred1 = lr.predict(X_test)
+print("Logistic Regression (SMOTE) Accuracy:", accuracy_score(y_test, y_pred1))
+accuracy[str(lr)] = accuracy_score(y_test, y_pred1) * 100
+cm = confusion_matrix(y_test, y_pred1)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, y_pred1))
+knn_model = KNeighborsClassifier(n_neighbors=3)
+knn_model.fit(X_train, y_train)
+knn_predict = knn_model.predict(X_test)
+print("KNN (SMOTE) Accuracy:", accuracy_score(y_test, knn_predict))
+accuracy[str(knn_model)] = accuracy_score(y_test, knn_predict) * 100
+cm = confusion_matrix(y_test, knn_predict)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+print(classification_report(y_test, knn_predict))
+model = keras.Sequential([
+    keras.layers.Dense(4800, input_shape=(x.shape[1],), activation='relu'),
+    keras.layers.Dense(2000, activation='relu'),
+    keras.layers.Dense(1000, activation='relu'),
+    keras.layers.Dense(1000, activation='relu'),
+    keras.layers.Dense(1, activation="sigmoid")
+])
+model.summary()
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=100, batch_size=100, verbose=0)
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print("Neural Network 1 Accuracy:", acc)
+y_pred = model.predict(X_test).flatten()
+y_pred = np.round(y_pred)
+print(classification_report(y_test, y_pred))
+cm = confusion_matrix(y_test, y_pred)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
+model = Sequential()
+model.add(Dense(512, activation='relu', input_shape=(x.shape[1],)))
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(256, activation='relu'))
+model.add(Dense(256, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(128, activation='relu'))
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(1, activation='sigmoid'))
+model.summary()
+model.compile(loss="binary_crossentropy", optimizer=Adam(learning_rate=0.0001), metrics=['accuracy'])
+cb = EarlyStopping(monitor='accuracy', min_delta=0.001, patience=100, mode='auto')
+model.fit(X_train, y_train, epochs=50, batch_size=100, validation_split=0.30, callbacks=[cb], verbose=0)
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print("Neural Network 2 Accuracy:", acc)
+y_pred = model.predict(X_test).flatten()
+y_pred = np.round(y_pred)
+print(classification_report(y_test, y_pred))
+cm = confusion_matrix(y_test, y_pred)
+conf_matrix = pd.DataFrame(data=cm, columns=['Predicted:0', 'Predicted:1'], index=['Actual:0', 'Actual:1'])
+plt.figure(figsize=(8, 5))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap="YlGnBu")
+plt.show()
