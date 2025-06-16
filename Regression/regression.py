@@ -21,7 +21,6 @@ data_info = pd.concat([data_type, null_value], axis=0)
 print(data_info)
 
 print(data.nunique())
-
 print(data.head())
 
 corr = data.select_dtypes(include=[np.number]).corr()  # Only numeric columns
@@ -83,7 +82,7 @@ plt.title('Model Evaluation: SalePrice vs GrLivArea')
 plt.legend(loc='upper left')
 plt.show()
 
-mse = mean_squared_error(Y_test, y_test_pred).round(2)
+mse = round(mean_squared_error(Y_test, y_test_pred), 2)
 print("Mean Squared Error:", mse)
 
 diff = (Y_test - Y_test.mean())
